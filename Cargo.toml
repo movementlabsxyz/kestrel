@@ -1,0 +1,72 @@
+[workspace]
+
+resolver = "2"
+
+members = [
+  "util/commander",
+  "util/jsonlvar/*",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Movement Labs"]
+repository = "www.github.com/movementlabsxyz/ffs"
+homepage = "www.github.com/movementlabsxyz/ffs"
+publish = false
+rust-version = "1.81.0"
+
+[workspace.dependencies]
+anyhow = "1.0"
+async-stream = "0.3.0"
+async-trait = "0.1.71"
+clap = { version = "4.4.10", features = ["derive"] }
+dotenv = "0.15.0"
+futures = "0.3.17"
+serde = "1.0"
+serde_json = "1.0"
+serde_derive = "1.0"
+thiserror = "1.0.50"
+tracing = "0.1.40"
+tracing-appender = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-test = "0.2.5"
+tokio = { version = "1.35.1", features = ["full", "tracing"] }
+tokio-stream = "0.1.15"
+hex = { version = "0.4.3", default-features = false, features = [
+  "alloc",
+  "serde",
+] }
+zip = { version = "2.4.2", features = ["flate2"] }
+walkdir = "2.3.2"
+tempfile = "3.5.0"
+itertools = "0.14.0"
+regex = "1.9.0"
+syn = { version = "2.0", features = ["full"] }
+quote = "1.0.23"
+proc-macro2 = "1.0.32"
+
+# model checking and verification
+
+# internal
+## util
+commander = { path = "util/commander" }
+jsonlvar = { path = "util/jsonlvar/core" }
+jsonlvar-util = { path = "util/jsonlvar/util" }
+jsonlvar-macro = { path = "util/jsonlvar/macro" }
+
+[workspace.lints.clippy]
+debug_assert_with_mut_call = "deny"
+inefficient_to_string = "deny"
+map_flatten = "deny"
+manual_ok_or = "deny"
+doc_link_with_quotes = "deny"
+match_same_arms = "deny"
+semicolon_if_nothing_returned = "deny"
+
+[profile.dev]
+panic = "unwind"
+
+[profile.release.build-override]
+opt-level = 3
