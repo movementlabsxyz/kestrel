@@ -3,6 +3,11 @@
 resolver = "2"
 
 members = [
+
+  # kestrel
+  "kestrel/kestrel-state",
+
+  # util
   "util/commander",
   "util/jsonlvar/*",
 ]
@@ -50,6 +55,9 @@ proc-macro2 = "1.0.32"
 # model checking and verification
 
 # internal
+## kestrel
+kestrel-state = { path = "kestrel/kestrel-state" }
+
 ## util
 commander = { path = "util/commander" }
 jsonlvar = { path = "util/jsonlvar/core" }
