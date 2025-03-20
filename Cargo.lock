@@ -298,7 +298,10 @@ name = "kestrel-process"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "commander",
+ "kestrel-state",
  "tempfile",
+ "thiserror",
  "tokio",
 ]
 

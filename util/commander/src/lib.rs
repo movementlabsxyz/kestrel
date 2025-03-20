@@ -13,7 +13,7 @@ use tracing::info;
 async fn pipe_output<R, O>(
 	reader: R,
 	mut default_writer: BufWriter<O>, // Default stdout/stderr
-	senders: Vec<Sender<String>>,     // Multiple fanout receivers
+	senders: &Vec<Sender<String>>,    // Multiple fanout receivers
 	capture_output: bool,
 	mut output: Option<&mut String>, // Optional in-memory capture
 ) -> Result<()>
@@ -31,7 +31,7 @@ where
 		default_writer.flush().await?;
 
 		// Fan out to all senders (non-blocking)
-		for sender in &senders {
+		for sender in senders {
 			let _ = sender.send(formatted_line.clone()).await; // Clone per receiver
 		}
 
@@ -59,30 +59,38 @@ where
 	I: IntoIterator<Item = S> + Send,
 	S: AsRef<OsStr>,
 {
-	let mut command = Command::new(command);
+	let mut command = Command::new(command, capture_output, stdout_senders, stderr_senders);
 	command.args(args);
 	if let Some(dir) = working_dir {
 		command.current_dir(dir);
 	}
-	command
-		.run_and_capture_output(capture_output, stdout_senders, stderr_senders)
-		.await
+	command.run().await
 }
 
 /// Builder for running commands
-pub struct Command(InnerCommand);
+pub struct Command {
+	inner: InnerCommand,
+	capture_output: bool,
+	stdout_senders: Vec<Sender<String>>,
+	stderr_senders: Vec<Sender<String>>,
+}
 
 impl Command {
-	pub fn new(program: impl AsRef<OsStr>) -> Self {
+	pub fn new(
+		program: impl AsRef<OsStr>,
+		capture_output: bool,
+		stdout_senders: Vec<Sender<String>>,
+		stderr_senders: Vec<Sender<String>>,
+	) -> Self {
 		let inner = InnerCommand::new(program);
-		Self(inner)
+		Self { inner, capture_output, stdout_senders, stderr_senders }
 	}
 
 	pub fn arg<S>(&mut self, arg: S) -> &mut Self
 	where
 		S: AsRef<OsStr>,
 	{
-		self.0.arg(arg);
+		self.inner.arg(arg);
 		self
 	}
 
@@ -91,32 +99,27 @@ impl Command {
 		I: IntoIterator<Item = S>,
 		S: AsRef<OsStr>,
 	{
-		self.0.args(args);
+		self.inner.args(args);
 		self
 	}
 
 	pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut Self {
-		self.0.current_dir(dir);
+		self.inner.current_dir(dir);
 		self
 	}
 
 	/// Runs the command and captures its output while streaming it.
-	pub async fn run_and_capture_output(
-		&mut self,
-		capture_output: bool,
-		stdout_senders: Vec<Sender<String>>,
-		stderr_senders: Vec<Sender<String>>,
-	) -> Result<String> {
-		let cmd_display = self.0.as_std().get_program().to_string_lossy().into_owned();
+	pub async fn run(&mut self) -> Result<String> {
+		let cmd_display = self.inner.as_std().get_program().to_string_lossy().into_owned();
 		let args_display = self
-			.0
+			.inner
 			.as_std()
 			.get_args()
 			.map(|s| s.to_string_lossy())
 			.collect::<Vec<_>>()
 			.join(" ");
 		let working_dir = self
-			.0
+			.inner
 			.as_std()
 			.get_current_dir()
 			.map(|p| p.to_string_lossy().into_owned())
@@ -139,7 +142,7 @@ impl Command {
 			}
 		});
 
-		let mut child = self.0.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?;
+		let mut child = self.inner.stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?;
 
 		let stdout = child.stdout.take().ok_or_else(|| {
 			anyhow::anyhow!("Failed to capture standard output from command {cmd_display}")
@@ -148,8 +151,8 @@ impl Command {
 			anyhow::anyhow!("Failed to capture standard error from command {cmd_display}")
 		})?;
 
-		let mut stdout_output = if capture_output { Some(String::new()) } else { None };
-		let mut stderr_output = if capture_output { Some(String::new()) } else { None };
+		let mut stdout_output = if self.capture_output { Some(String::new()) } else { None };
+		let mut stderr_output = if self.capture_output { Some(String::new()) } else { None };
 
 		let stdout_writer = BufWriter::new(io::stdout());
 		let stderr_writer = BufWriter::new(io::stderr());
@@ -157,15 +160,15 @@ impl Command {
 		let stdout_future = pipe_output(
 			stdout,
 			stdout_writer,
-			stdout_senders,
-			capture_output,
+			&self.stdout_senders,
+			self.capture_output,
 			stdout_output.as_mut(),
 		);
 		let stderr_future = pipe_output(
 			stderr,
 			stderr_writer,
-			stderr_senders,
-			capture_output,
+			&self.stderr_senders,
+			self.capture_output,
 			stderr_output.as_mut(),
 		);
 

@@ -9,6 +9,7 @@ pub struct State<T: Clone + Send + Sync + 'static> {
 }
 
 /// Wrapper for writable state
+#[derive(Clone)]
 pub struct WritableState<T: Clone + Send + Sync + 'static> {
 	state: State<T>,
 }
