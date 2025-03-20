@@ -7,7 +7,7 @@ kestrel
   </pre>
 </div>
 
-# ffs
+# kestrel
 
 Kestrel is a framework for process orchestration combining imperative and declarative programming paradigms. It is intended for rapid prototyping of highly interdependent systems, particularly in the context of distributed computing and networking.
 
