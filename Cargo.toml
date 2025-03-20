@@ -63,8 +63,8 @@ kestrel-state = { path = "kestrel/kestrel-state" }
 
 ## util
 commander = { path = "util/commander" }
-jsonlvar = { path = "util/jsonlvar/core" }
-jsonlvar-util = { path = "util/jsonlvar/util" }
+jsonlvar = { path = "util/jsonlvar/jsonlvar" }
+jsonlvar-core = { path = "util/jsonlvar/core" }
 jsonlvar-macro = { path = "util/jsonlvar/macro" }
 
 [workspace.lints.clippy]

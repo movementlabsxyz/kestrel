@@ -1,5 +1,5 @@
 [package]
-name = "jsonlvar-util"
+name = "jsonlvar"
 version = { workspace = true }
 edition = { workspace = true }
 license = { workspace = true }
@@ -14,8 +14,8 @@ rust-version = { workspace = true }
 [dependencies]
 serde_json = { workspace = true }
 regex = { workspace = true }
-thiserror = { workspace = true }
-serde = { workspace = true }
+jsonlvar-core = { workspace = true }
+jsonlvar-macro = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

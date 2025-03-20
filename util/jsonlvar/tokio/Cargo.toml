@@ -1,5 +1,5 @@
 [package]
-name = "jsonlvar-core"
+name = "jsonlvar-tokio"
 version = { workspace = true }
 edition = { workspace = true }
 license = { workspace = true }
@@ -15,7 +15,10 @@ rust-version = { workspace = true }
 serde_json = { workspace = true }
 regex = { workspace = true }
 thiserror = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+jsonlvar = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

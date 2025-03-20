@@ -231,11 +231,22 @@ checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 name = "jsonlvar"
 version = "0.0.1"
 dependencies = [
+ "jsonlvar-core",
  "jsonlvar-macro",
- "jsonlvar-util",
  "regex",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "jsonlvar-core"
+version = "0.0.1"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]
@@ -251,14 +262,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "jsonlvar-util"
+name = "jsonlvar-tokio"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
+ "jsonlvar",
  "regex",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
