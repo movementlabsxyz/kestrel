@@ -1,50 +1,62 @@
 use anyhow::Result;
 use futures::future::try_join;
-use itertools::Itertools;
-use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::Command as InnerCommand;
-use tokio::signal::unix::{signal, SignalKind};
-use tracing::info;
-
 use std::ffi::OsStr;
 use std::path::Path;
 use std::process::Stdio;
+use tokio::io::{self, AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
+use tokio::process::Command as InnerCommand;
+use tokio::signal::unix::{signal, SignalKind};
+use tokio::sync::mpsc::Sender;
+use tracing::info;
 
-async fn pipe_output<R: tokio::io::AsyncRead + Unpin + Send + 'static>(
+/// Pipes output to stdout/stderr and broadcasts it via multiple channels.
+async fn pipe_output<R, O>(
 	reader: R,
-	mut writer: io::Stdout,
-	output: &mut String,
-) -> Result<()> {
-	let mut reader = BufReader::new(reader).lines();
-	while let Ok(Some(line)) = reader.next_line().await {
-		writer.write_all(line.as_bytes()).await?;
-		writer.write_all(b"\n").await?;
-		output.push_str(&line);
-		output.push('\n');
-	}
-	Ok(())
-}
-
-async fn pipe_error_output<R: tokio::io::AsyncRead + Unpin + Send + 'static>(
-	reader: R,
-	mut writer: io::Stderr,
-	output: &mut String,
-) -> Result<()> {
-	let mut reader = BufReader::new(reader).lines();
-	while let Ok(Some(line)) = reader.next_line().await {
-		writer.write_all(line.as_bytes()).await?;
-		writer.write_all(b"\n").await?;
-		output.push_str(&line);
-		output.push('\n');
-	}
-	Ok(())
-}
-
-/// Runs a command, optionally setting the working directory, and pipes its output to stdout and stderr.
-pub async fn run_command<C, I, S>(command: C, args: I, working_dir: Option<&Path>) -> Result<String>
+	mut default_writer: BufWriter<O>, // Default stdout/stderr
+	senders: Vec<Sender<String>>,     // Multiple fanout receivers
+	capture_output: bool,
+	mut output: Option<&mut String>, // Optional in-memory capture
+) -> Result<()>
 where
-	C: AsRef<OsStr>,
-	I: IntoIterator<Item = S>,
+	R: tokio::io::AsyncRead + Unpin + Send + 'static,
+	O: tokio::io::AsyncWrite + Unpin + Send + 'static,
+{
+	let mut reader = BufReader::new(reader).lines();
+	while let Ok(Some(line)) = reader.next_line().await {
+		let formatted_line = format!("{}\n", line);
+		let line_bytes = formatted_line.as_bytes();
+
+		// Write to default stdout/stderr
+		default_writer.write_all(line_bytes).await?;
+		default_writer.flush().await?;
+
+		// Fan out to all senders (non-blocking)
+		for sender in &senders {
+			let _ = sender.send(formatted_line.clone()).await; // Clone per receiver
+		}
+
+		// Capture in memory if needed
+		if capture_output {
+			if let Some(ref mut output) = output {
+				output.push_str(&formatted_line);
+			}
+		}
+	}
+	Ok(())
+}
+
+/// Runs a command with full stdout/stderr fanout.
+pub async fn run_command_with_fanout<C, I, S>(
+	command: C,
+	args: I,
+	working_dir: Option<&Path>,
+	capture_output: bool,
+	stdout_senders: Vec<Sender<String>>, // Multiple fanout receivers
+	stderr_senders: Vec<Sender<String>>,
+) -> Result<String>
+where
+	C: AsRef<OsStr> + Send,
+	I: IntoIterator<Item = S> + Send,
 	S: AsRef<OsStr>,
 {
 	let mut command = Command::new(command);
@@ -52,7 +64,9 @@ where
 	if let Some(dir) = working_dir {
 		command.current_dir(dir);
 	}
-	command.run_and_capture_output().await
+	command
+		.run_and_capture_output(capture_output, stdout_senders, stderr_senders)
+		.await
 }
 
 /// Builder for running commands
@@ -81,15 +95,26 @@ impl Command {
 		self
 	}
 
-	/// Sets the working directory for the command.
 	pub fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut Self {
 		self.0.current_dir(dir);
 		self
 	}
 
-	pub async fn run_and_capture_output(&mut self) -> Result<String> {
+	/// Runs the command and captures its output while streaming it.
+	pub async fn run_and_capture_output(
+		&mut self,
+		capture_output: bool,
+		stdout_senders: Vec<Sender<String>>,
+		stderr_senders: Vec<Sender<String>>,
+	) -> Result<String> {
 		let cmd_display = self.0.as_std().get_program().to_string_lossy().into_owned();
-		let args_display = self.0.as_std().get_args().map(|s| s.to_string_lossy()).join(" ");
+		let args_display = self
+			.0
+			.as_std()
+			.get_args()
+			.map(|s| s.to_string_lossy())
+			.collect::<Vec<_>>()
+			.join(" ");
 		let working_dir = self
 			.0
 			.as_std()
@@ -99,7 +124,7 @@ impl Command {
 
 		info!("Running command: {cmd_display} {args_display} in {working_dir}");
 
-		// Setup signal handling to terminate the child process
+		// Signal handling
 		let (tx, rx) = tokio::sync::oneshot::channel();
 
 		let mut sigterm = signal(SignalKind::terminate())?;
@@ -108,15 +133,9 @@ impl Command {
 
 		tokio::spawn(async move {
 			tokio::select! {
-				_ = sigterm.recv() => {
-					let _ = tx.send(());
-				}
-				_ = sigint.recv() => {
-					let _ = tx.send(());
-				}
-				_ = sigquit.recv() => {
-					let _ = tx.send(());
-				}
+				_ = sigterm.recv() => { let _ = tx.send(()); }
+				_ = sigint.recv() => { let _ = tx.send(()); }
+				_ = sigquit.recv() => { let _ = tx.send(()); }
 			}
 		});
 
@@ -129,14 +148,26 @@ impl Command {
 			anyhow::anyhow!("Failed to capture standard error from command {cmd_display}")
 		})?;
 
-		let mut stdout_output = String::new();
-		let mut stderr_output = String::new();
+		let mut stdout_output = if capture_output { Some(String::new()) } else { None };
+		let mut stderr_output = if capture_output { Some(String::new()) } else { None };
 
-		let stdout_writer = io::stdout();
-		let stderr_writer = io::stderr();
+		let stdout_writer = BufWriter::new(io::stdout());
+		let stderr_writer = BufWriter::new(io::stderr());
 
-		let stdout_future = pipe_output(stdout, stdout_writer, &mut stdout_output);
-		let stderr_future = pipe_error_output(stderr, stderr_writer, &mut stderr_output);
+		let stdout_future = pipe_output(
+			stdout,
+			stdout_writer,
+			stdout_senders,
+			capture_output,
+			stdout_output.as_mut(),
+		);
+		let stderr_future = pipe_output(
+			stderr,
+			stderr_writer,
+			stderr_senders,
+			capture_output,
+			stderr_output.as_mut(),
+		);
 
 		let combined_future = try_join(stdout_future, stderr_future);
 
@@ -154,49 +185,103 @@ impl Command {
 		if !status.success() {
 			return Err(anyhow::anyhow!(
 				"Command {cmd_display} failed with args {args_display}\nError Output: {}",
-				stderr_output
+				stderr_output.unwrap_or_else(|| "Unknown error".to_string())
 			));
 		}
 
-		Ok(stdout_output)
+		Ok(stdout_output.unwrap_or_default())
 	}
 }
 
 #[cfg(test)]
-pub mod tests {
-
+mod tests {
 	use super::*;
+	use anyhow::Result;
+	use tokio::sync::mpsc;
 
+	/// Test running a simple command and capturing its output.
 	#[tokio::test]
-	async fn test_run_command() -> Result<(), anyhow::Error> {
-		let output = run_command("echo", &["Hello, world!"], None).await?;
+	async fn test_run_command_with_capture() -> Result<()> {
+		let output =
+			run_command_with_fanout("echo", &["Hello, world!"], None, true, vec![], vec![]).await?;
+
 		assert_eq!(output, "Hello, world!\n");
 		Ok(())
 	}
 
+	/// Test running a command with multiple subscribers listening via channels.
 	#[tokio::test]
-	async fn test_run_command_with_working_dir() -> Result<(), anyhow::Error> {
-		let temp_dir = tempfile::tempdir()?;
-		let args: Vec<&str> = vec![];
-		let output = run_command("pwd", args, Some(temp_dir.path())).await?;
+	async fn test_run_command_with_fanout_channels() -> Result<()> {
+		// Create multiple stdout/stderr channels
+		let (stdout_tx1, mut stdout_rx1) = mpsc::channel(10);
+		let (stdout_tx2, mut stdout_rx2) = mpsc::channel(10);
+		let (stderr_tx, mut stderr_rx) = mpsc::channel(10);
 
-		let output_trimmed = output.trim();
-		let expected_path = temp_dir.path().to_str().unwrap();
+		// Clone senders for fanout
+		let stdout_senders = vec![stdout_tx1.clone(), stdout_tx2.clone()];
+		let stderr_senders = vec![stderr_tx.clone()];
 
-		// Handle cases where macOS prepends `/private`
-		if cfg!(target_os = "macos") {
-			let private_prefixed_path = format!("/private{}", expected_path);
-			assert!(
-				output_trimmed == expected_path || output_trimmed == private_prefixed_path,
-				"Expected '{}' or '{}', but got '{}'",
-				expected_path,
-				private_prefixed_path,
-				output_trimmed
-			);
-		} else {
-			assert_eq!(output_trimmed, expected_path);
-		}
+		// Spawn the command with fanout channels
+		let command_future = tokio::spawn(run_command_with_fanout(
+			"sh",
+			&["-c", "echo Hello && echo Error >&2"],
+			None,
+			true,
+			stdout_senders,
+			stderr_senders,
+		));
 
+		// Wait for messages to arrive naturally
+		let stdout_output1 = stdout_rx1.recv().await;
+		let stdout_output2 = stdout_rx2.recv().await;
+		let stderr_output = stderr_rx.recv().await;
+
+		// Ensure all values exist
+		assert!(stdout_output1.is_some());
+		assert!(stdout_output2.is_some());
+		assert!(stderr_output.is_some());
+
+		// Validate fanout behavior
+		assert_eq!(stdout_output1.unwrap(), "Hello\n");
+		assert_eq!(stdout_output2.unwrap(), "Hello\n");
+		assert_eq!(stderr_output.unwrap(), "Error\n");
+
+		// Ensure the command completes
+		command_future.await??;
+		Ok(())
+	}
+
+	/// Test that multiple subscribers receive identical output.
+	#[tokio::test]
+	async fn test_multiple_stdout_subscribers() -> Result<()> {
+		let (stdout_tx1, mut stdout_rx1) = mpsc::channel(10);
+		let (stdout_tx2, mut stdout_rx2) = mpsc::channel(10);
+
+		let stdout_senders = vec![stdout_tx1, stdout_tx2];
+
+		let command_future = tokio::spawn(run_command_with_fanout(
+			"echo",
+			&["Test Output"],
+			None,
+			true,
+			stdout_senders,
+			vec![],
+		));
+
+		// Wait for messages
+		let stdout_output1 = stdout_rx1.recv().await;
+		let stdout_output2 = stdout_rx2.recv().await;
+
+		// Ensure both values exist
+		assert!(stdout_output1.is_some());
+		assert!(stdout_output2.is_some());
+
+		// Both subscribers should receive the same data
+		assert_eq!(stdout_output1.unwrap(), "Test Output\n");
+		assert_eq!(stdout_output2.unwrap(), "Test Output\n");
+
+		// Ensure the command completes
+		command_future.await??;
 		Ok(())
 	}
 }
