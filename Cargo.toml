@@ -5,7 +5,7 @@ resolver = "2"
 members = [
 
   # kestrel
-  "kestrel/kestrel-state",
+  "kestrel/*",
 
   # util
   "util/commander",
@@ -56,6 +56,9 @@ proc-macro2 = "1.0.32"
 
 # internal
 ## kestrel
+kestrel = { path = "kestrel/kestrel" }
+kestrel-macro = { path = "kestrel/kestrel-macro" }
+kestrel-util = { path = "kestrel/kestrel-util" }
 kestrel-state = { path = "kestrel/kestrel-state" }
 
 ## util

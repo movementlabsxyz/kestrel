@@ -262,7 +262,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "kestrel"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "kestrel-macro"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "kestrel-state"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "kestrel-util"
 version = "0.0.1"
 dependencies = [
  "anyhow",
