@@ -291,6 +291,7 @@ dependencies = [
  "anyhow",
  "kestrel-macro",
  "kestrel-process",
+ "kestrel-state",
  "tempfile",
  "tokio",
 ]
