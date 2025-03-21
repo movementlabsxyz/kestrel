@@ -76,6 +76,27 @@ pub struct Command {
 }
 
 impl Command {
+	pub fn line<C, I, S>(
+		command: C,
+		args: I,
+		working_dir: Option<&Path>,
+		capture_output: bool,
+		stdout_senders: Vec<Sender<String>>, // Multiple fanout receivers
+		stderr_senders: Vec<Sender<String>>,
+	) -> Self
+	where
+		C: AsRef<OsStr> + Send,
+		I: IntoIterator<Item = S> + Send,
+		S: AsRef<OsStr>,
+	{
+		let mut command = Command::new(command, capture_output, stdout_senders, stderr_senders);
+		command.args(args);
+		if let Some(dir) = working_dir {
+			command.current_dir(dir);
+		}
+		command
+	}
+
 	pub fn new(
 		program: impl AsRef<OsStr>,
 		capture_output: bool,
@@ -100,6 +121,16 @@ impl Command {
 		S: AsRef<OsStr>,
 	{
 		self.inner.args(args);
+		self
+	}
+
+	pub fn append_stdout(&mut self, sender: Sender<String>) -> &mut Self {
+		self.stdout_senders.push(sender);
+		self
+	}
+
+	pub fn append_stderr(&mut self, sender: Sender<String>) -> &mut Self {
+		self.stderr_senders.push(sender);
 		self
 	}
 

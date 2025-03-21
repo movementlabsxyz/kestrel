@@ -1,3 +1,6 @@
+pub mod custom;
+pub mod jsonl;
+
 use kestrel_state::WritableState;
 use std::future::Future;
 use thiserror::Error;
@@ -10,6 +13,9 @@ pub enum FulfillError {
 
 	#[error("failed to get sender: {0}")]
 	Sender(#[source] Box<dyn std::error::Error + Send + Sync>),
+
+	#[error("internal fulfillment error: {0}")]
+	Internal(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
 
 pub trait Fulfill<T>: Sized + Send + Sync + 'static
@@ -17,16 +23,16 @@ where
 	T: Clone + Send + Sync + 'static,
 {
 	/// Gets the sender that will be used to fulfill the request via the pipe.
-	fn sender(&self) -> Result<Sender<T>, FulfillError>;
+	fn sender(&self) -> Result<Sender<String>, FulfillError>;
 
 	/// Gets the writable state value which is supposed to be fulfilled.
 	fn dependency(&self) -> Result<WritableState<T>, FulfillError>;
 
 	/// Attempts to get the value to fulfill the request.
-	fn try_get(&self) -> impl Future<Output = Result<Option<T>, FulfillError>> + Send;
+	fn try_get(&mut self) -> impl Future<Output = Result<Option<T>, FulfillError>> + Send;
 
 	/// Attempts to update the writable state value with the fulfilled value.
-	fn try_fulfill(&self) -> impl Future<Output = Result<T, FulfillError>> + Send {
+	fn try_fulfill(&mut self) -> impl Future<Output = Result<T, FulfillError>> + Send {
 		async {
 			match self.try_get().await? {
 				Some(value) => {
@@ -39,7 +45,7 @@ where
 	}
 
 	/// Runs the fulfillment task
-	fn run(self) -> impl Future<Output = Result<T, FulfillError>> + Send {
+	fn run(mut self) -> impl Future<Output = Result<T, FulfillError>> + Send {
 		async move {
 			loop {
 				match self.try_fulfill().await {

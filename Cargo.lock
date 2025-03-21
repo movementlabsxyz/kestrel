@@ -299,6 +299,8 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "commander",
+ "jsonlvar",
+ "jsonlvar-tokio",
  "kestrel-state",
  "tempfile",
  "thiserror",

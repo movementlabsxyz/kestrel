@@ -66,6 +66,7 @@ commander = { path = "util/commander" }
 jsonlvar = { path = "util/jsonlvar/jsonlvar" }
 jsonlvar-core = { path = "util/jsonlvar/core" }
 jsonlvar-macro = { path = "util/jsonlvar/macro" }
+jsonlvar-tokio = { path = "util/jsonlvar/tokio" }
 
 [workspace.lints.clippy]
 debug_assert_with_mut_call = "deny"
