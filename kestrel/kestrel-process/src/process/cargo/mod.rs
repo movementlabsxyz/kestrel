@@ -70,45 +70,6 @@ pub trait RegisteredBin {
 	}
 }
 
-#[macro_export]
-macro_rules! kestrelize {
-	() => {
-		// Helper: Convert kebab-case to PascalCase
-		macro_rules! kebab_to_pascal {
-			($name:expr) => {{
-				let mut result = String::new();
-				let mut capitalize = true;
-				for ch in $name.chars() {
-					if ch == '-' {
-						capitalize = true;
-					} else if capitalize {
-						result.push(ch.to_ascii_uppercase());
-						capitalize = false;
-					} else {
-						result.push(ch);
-					}
-				}
-				result
-			}};
-		}
-
-		const _PACKAGE_NAME: &str = env!("CARGO_PKG_NAME");
-		const _STRUCT_NAME: &str = kebab_to_pascal!(_PACKAGE_NAME);
-
-		// Use `paste` for dynamic struct name
-		paste::paste! {
-			#[allow(non_camel_case_types)]
-			pub struct [<_STRUCT_NAME>];
-
-			impl $crate::RegisteredBin for [<_STRUCT_NAME>] {
-				fn cargo_bin() -> &'static str {
-					_PACKAGE_NAME
-				}
-			}
-		}
-	};
-}
-
 /// Runs a command on the command line and captures its output.
 pub struct Bin<B>
 where

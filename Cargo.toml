@@ -51,6 +51,8 @@ regex = "1.9.0"
 syn = { version = "2.0", features = ["full"] }
 quote = "1.0.23"
 proc-macro2 = "1.0.32"
+paste = "1.0.12"
+convert_case = "0.8.0"
 
 # model checking and verification
 
@@ -60,6 +62,7 @@ kestrel = { path = "kestrel/kestrel" }
 kestrel-macro = { path = "kestrel/kestrel-macro" }
 kestrel-util = { path = "kestrel/kestrel-util" }
 kestrel-state = { path = "kestrel/kestrel-state" }
+kestrel-process = { path = "kestrel/kestrel-process" }
 
 ## util
 commander = { path = "util/commander" }

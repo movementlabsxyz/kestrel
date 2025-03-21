@@ -18,6 +18,7 @@ thiserror = { workspace = true }
 kestrel-state = { workspace = true }
 jsonlvar = { workspace = true }
 jsonlvar-tokio = { workspace = true }
+paste = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
