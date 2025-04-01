@@ -71,13 +71,21 @@ impl<T: Clone + Send + Sync + 'static> ReadOnlyState<T> {
 	/// Waits for the state to be set and returns the value.
 	pub async fn wait_for(&self) -> T {
 		loop {
-			{
-				let lock = self.state.inner.read().await;
-				if let Some(value) = lock.clone() {
-					return value;
-				}
+			// First check if the value is already set
+			if let Some(value) = self.state.inner.read().await.clone() {
+				return value;
 			}
-			self.state.notify.notified().await;
+
+			// If not set, prepare to wait
+			let notified = self.state.notify.notified();
+
+			// Double-check the value before waiting
+			if let Some(value) = self.state.inner.read().await.clone() {
+				return value;
+			}
+
+			// Now wait for notification
+			notified.await;
 		}
 	}
 
