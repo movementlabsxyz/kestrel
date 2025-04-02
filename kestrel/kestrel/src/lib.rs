@@ -1,11 +1,32 @@
+use futures::future::{AbortHandle, Abortable, Aborted};
 pub use kestrel_macro::*;
 pub use kestrel_process::*;
 pub use kestrel_state::*;
 use std::cell::RefCell;
 use std::future::Future;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::pin::Pin;
+use std::sync::atomic::AtomicU64;
+use std::task::{Context, Poll};
 use std::thread_local;
-use tokio::task::AbortHandle;
+use tokio::task::JoinHandle;
+
+/// Errors thrown by the Task struct.
+#[derive(Debug, thiserror::Error)]
+pub enum TaskError {
+	#[error("task aborted: {0}")]
+	Aborted(#[source] Aborted),
+	#[error("join error: {0}")]
+	Join(#[source] tokio::task::JoinError),
+	#[error("multiple errors encountered across tasks: {0:?}")]
+	MultipleErrors(Vec<TaskError>),
+}
+
+/// A value that may be aborted
+#[derive(Debug)]
+pub enum Maybe<T> {
+	Value(T),
+	Aborted(Aborted),
+}
 
 /// A unique identifier for tasks
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -14,12 +35,8 @@ pub struct TaskId(u64);
 /// A task that can be spawned, aborted, and awaited
 #[derive(Debug)]
 pub struct Task<T> {
-	/// Unique identifier for the task
-	pub id: TaskId,
-	/// Human-readable name for the task
-	pub name: String,
 	/// The join handle for awaiting the task
-	pub handle: JoinHandle<T>,
+	pub handle: JoinHandle<Result<T, Aborted>>,
 	/// The abort handle for cancelling the task
 	pub abort_handle: AbortHandle,
 }
@@ -29,25 +46,49 @@ thread_local! {
 }
 
 impl<T> Task<T> {
-	/// Creates a new task with the given name
-	pub fn new(name: impl Into<String>, handle: JoinHandle<T>, abort_handle: AbortHandle) -> Self {
-		let id = NEXT_TASK_ID.with(|next_id| {
-			let current = next_id.borrow().load(Ordering::Relaxed);
-			next_id.borrow().store(current + 1, Ordering::Relaxed);
-			TaskId(current)
-		});
-
-		Self { id, name: name.into(), handle, abort_handle }
-	}
-
 	/// Aborts the task
 	pub fn abort(&self) {
 		self.abort_handle.abort();
 	}
 
-	/// Awaits the task's completion
-	pub async fn await_completion(self) -> Result<T, tokio::task::JoinError> {
-		self.handle.await
+	/// Returns whether the task has been aborted
+	pub fn is_aborted(&self) -> bool {
+		self.abort_handle.is_aborted()
+	}
+
+	/// Awaits a task, but allows an abort by wrapping as a [Maybe]
+	pub async fn maybe(self) -> Result<Maybe<T>, TaskError> {
+		match self.await {
+			Ok(result) => Ok(Maybe::Value(result)),
+			Err(e) => match e {
+				TaskError::Aborted(e) => Ok(Maybe::Aborted(e)),
+				TaskError::Join(e) => Err(TaskError::Join(e)),
+				TaskError::MultipleErrors(e) => Err(TaskError::MultipleErrors(e)),
+			},
+		}
+	}
+
+	/// Awaits a task, but allows an abort
+	pub async fn await_allow_abort(self) -> Result<(), TaskError> {
+		match self.maybe().await {
+			Ok(_) => Ok(()),
+			Err(e) => Err(e),
+		}
+	}
+}
+
+impl<T> Future for Task<T> {
+	type Output = Result<T, TaskError>;
+
+	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		match Pin::new(&mut self.handle).poll(cx) {
+			Poll::Pending => Poll::Pending,
+			Poll::Ready(Ok(result)) => match result {
+				Ok(result) => Poll::Ready(Ok(result)),
+				Err(e) => Poll::Ready(Err(TaskError::Aborted(e))),
+			},
+			Poll::Ready(Err(e)) => Poll::Ready(Err(TaskError::Join(e))),
+		}
 	}
 }
 
@@ -57,48 +98,50 @@ where
 	F: Future<Output = T> + Send + 'static,
 	T: Send + 'static,
 {
-	let handle = tokio::task::spawn(f);
-	let abort_handle = handle.abort_handle();
+	let (abort_handle, abort_reg) = AbortHandle::new_pair();
+	let handle = tokio::task::spawn(Abortable::new(f, abort_reg));
 
-	// Get the caller's location for the task name
-	let caller = std::panic::Location::caller();
-	let name = format!("task_{}:{}", caller.file(), caller.line());
-
-	Task::new(name, handle, abort_handle)
+	Task { handle, abort_handle }
 }
 
-/// Awaits a list of tasks and allows them to be aborted
-pub async fn await_allow_abort<T, E>(tasks: Vec<Task<T>>) -> Result<Vec<T>, E>
-where
-	T: Send + 'static,
-	E: From<tokio::task::JoinError>,
-{
-	let mut results = Vec::with_capacity(tasks.len());
-	for task in tasks {
-		results.push(task.await_completion().await?);
-	}
-	Ok(results)
+/// Awaits multiple tasks but allows them to abort
+#[macro_export]
+macro_rules! await_allow_abort {
+    ($($task:expr),* $(,)?) => {{
+        let mut result = Ok(());
+        $(
+            if result.is_ok() {
+                result = $task.await_allow_abort().await;
+            }
+        )*
+        result
+    }};
 }
 
-/// Aborts a list of tasks
-pub fn abort(tasks: &[Task<impl Send + 'static>]) {
-	for task in tasks {
-		task.abort();
-	}
+/// Aborts multiple tasks
+#[macro_export]
+macro_rules! abort {
+    ($($task:expr),* $(,)?) => {
+        {
+            $(
+                $task.abort();
+            )*
+        }
+    };
 }
 
-/// Aborts all tasks and then awaits their completion
-pub async fn end_all<T, E>(tasks: Vec<Task<T>>) -> Result<Vec<T>, E>
-where
-	T: Send + 'static,
-	E: From<tokio::task::JoinError>,
-{
-	// First abort all tasks
-	abort(&tasks);
-
-	// Then await their completion
-	await_allow_abort(tasks).await
+#[macro_export]
+macro_rules! end {
+    ($($task:expr),* $(,)?) => {{
+        let mut result = Ok(());
+        $(
+            $task.abort();
+        )*
+        $(
+            if result.is_ok() {
+                result = $task.await_allow_abort().await;
+            }
+        )*
+        result
+    }};
 }
-
-/// Kestrel reuses tokio for basic task management.
-pub use tokio::{join, task::JoinHandle, try_join};

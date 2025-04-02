@@ -1,5 +1,5 @@
 [package]
-name = "kestrel"
+name = "kestrel-test"
 version = { workspace = true }
 edition = { workspace = true }
 license = { workspace = true }
@@ -13,11 +13,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 tokio = { workspace = true }
-kestrel-process = { workspace = true }
-kestrel-macro = { workspace = true }
-kestrel-state = { workspace = true }
-futures = { workspace = true }
-thiserror = { workspace = true }
+kestrel = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
