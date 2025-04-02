@@ -81,6 +81,12 @@ pub enum WaitCondition {
 /// Waits until the state is set
 pub const EVER: WaitCondition = WaitCondition::Ever;
 
+impl From<Duration> for WaitCondition {
+	fn from(duration: Duration) -> Self {
+		WaitCondition::Duration(duration)
+	}
+}
+
 impl<T: Clone + Send + Sync + 'static> ReadOnlyState<T> {
 	/// Returns the read guard for the state.
 	pub async fn read(&self) -> RwLockReadGuard<'_, Option<T>> {
@@ -121,8 +127,8 @@ impl<T: Clone + Send + Sync + 'static> ReadOnlyState<T> {
 	}
 
 	/// Waits for the state to be set up to a given condition.
-	pub async fn wait_for(&self, condition: WaitCondition) -> Result<T, WaitError> {
-		match condition {
+	pub async fn wait_for(&self, condition: impl Into<WaitCondition>) -> Result<T, WaitError> {
+		match condition.into() {
 			WaitCondition::Duration(duration) => self.wait_for_duration(duration).await,
 			WaitCondition::Ever => Ok(self.wait_forever().await),
 		}
