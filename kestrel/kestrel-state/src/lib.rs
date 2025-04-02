@@ -1,5 +1,7 @@
 use std::sync::Arc;
+use thiserror::Error;
 use tokio::sync::{Notify, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use tokio::time::{sleep, Duration};
 
 /// Main state container holding an optional value.
 #[derive(Clone)]
@@ -62,6 +64,23 @@ impl<T: Clone + Send + Sync + 'static> WritableState<T> {
 	}
 }
 
+/// Error that occurs when waiting for a state to be set.
+#[derive(Debug, Error)]
+pub enum WaitError {
+	#[error("condition not met: {0}")]
+	Condition(#[source] Box<dyn std::error::Error + Send + Sync>),
+}
+
+pub enum WaitCondition {
+	/// Waits up to the given duration
+	Duration(Duration),
+	/// Waits until the state is set
+	Ever,
+}
+
+/// Waits until the state is set
+pub const EVER: WaitCondition = WaitCondition::Ever;
+
 impl<T: Clone + Send + Sync + 'static> ReadOnlyState<T> {
 	/// Returns the read guard for the state.
 	pub async fn read(&self) -> RwLockReadGuard<'_, Option<T>> {
@@ -69,7 +88,7 @@ impl<T: Clone + Send + Sync + 'static> ReadOnlyState<T> {
 	}
 
 	/// Waits for the state to be set and returns the value.
-	pub async fn wait_for(&self) -> T {
+	pub async fn wait_forever(&self) -> T {
 		loop {
 			// First check if the value is already set
 			if let Some(value) = self.state.inner.read().await.clone() {
@@ -86,6 +105,26 @@ impl<T: Clone + Send + Sync + 'static> ReadOnlyState<T> {
 
 			// Now wait for notification
 			notified.await;
+		}
+	}
+
+	/// Waits for the state to be set up to a given duration.
+	pub async fn wait_for_duration(&self, duration: Duration) -> Result<T, WaitError> {
+		tokio::select! {
+			state = self.wait_forever() => {
+				Ok(state)
+			}
+			_ = sleep(duration) => {
+				Err(WaitError::Condition("timeout".into()))
+			}
+		}
+	}
+
+	/// Waits for the state to be set up to a given condition.
+	pub async fn wait_for(&self, condition: WaitCondition) -> Result<T, WaitError> {
+		match condition {
+			WaitCondition::Duration(duration) => self.wait_for_duration(duration).await,
+			WaitCondition::Ever => Ok(self.wait_forever().await),
 		}
 	}
 
@@ -120,8 +159,8 @@ pub mod test {
 		let task1: tokio::task::JoinHandle<Result<(String, String), anyhow::Error>> =
 			tokio::spawn(async move {
 				println!("Task 1 waiting for dependencies...");
-				let value_a = reader_a1.wait_for().await;
-				let value_b = reader_b.wait_for().await;
+				let value_a = reader_a1.wait_forever().await;
+				let value_b = reader_b.wait_forever().await;
 				println!("Task 1 got: A = {:?}, B = {:?}", value_a, value_b);
 				Ok((value_a, value_b)) // Return as Result
 			});
@@ -129,7 +168,7 @@ pub mod test {
 		let task2: tokio::task::JoinHandle<Result<String, anyhow::Error>> =
 			tokio::spawn(async move {
 				println!("Task 2 waiting for A...");
-				let value_a = reader_a2.wait_for().await;
+				let value_a = reader_a2.wait_forever().await;
 				println!("Task 2 got: A = {:?}", value_a);
 				Ok(value_a) // Return as Result
 			});
