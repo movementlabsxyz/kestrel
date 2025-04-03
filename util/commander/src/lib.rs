@@ -318,4 +318,32 @@ mod tests {
 		command_future.await??;
 		Ok(())
 	}
+
+	#[tokio::test]
+	async fn test_run_command_with_working_dir() -> Result<(), anyhow::Error> {
+		let temp_dir = tempfile::tempdir()?;
+		let args: Vec<&str> = vec![];
+		let output = Command::line("pwd", args, Some(temp_dir.path()), true, vec![], vec![])
+			.run()
+			.await?;
+
+		let output_trimmed = output.trim();
+		let expected_path = temp_dir.path().to_str().unwrap();
+
+		// Handle cases where macOS prepends `/private`
+		if cfg!(target_os = "macos") {
+			let private_prefixed_path = format!("/private{}", expected_path);
+			assert!(
+				output_trimmed == expected_path || output_trimmed == private_prefixed_path,
+				"Expected '{}' or '{}', but got '{}'",
+				expected_path,
+				private_prefixed_path,
+				output_trimmed
+			);
+		} else {
+			assert_eq!(output_trimmed, expected_path);
+		}
+
+		Ok(())
+	}
 }
