@@ -546,6 +546,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cargo_metadata",
+ "commander",
  "include-dir",
  "tempfile",
  "thiserror 1.0.69",

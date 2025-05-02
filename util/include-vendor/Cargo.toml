@@ -15,6 +15,7 @@ tempfile = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
 cargo_metadata = { workspace = true }
+commander = { workspace = true }
 
 [lints]
 workspace = true

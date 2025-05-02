@@ -150,7 +150,16 @@ macro_rules! workspace {
 				self.workspace.prepare_directory()
 			}
 
-			/// Runs a command in the workspace
+			/// Constructs a command to run in the workspace
+			pub fn command<C, I, S>(&self, command: C, args: I) -> commander::Command
+			where
+				C: AsRef<OsStr>,
+				I: IntoIterator<Item = S>,
+				S: AsRef<OsStr>,
+			{
+				self.workspace.command(command, args)
+			}
+
 			pub async fn run_command<C, I, S>(
 				&self,
 				command: C,

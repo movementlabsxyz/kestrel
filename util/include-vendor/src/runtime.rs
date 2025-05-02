@@ -22,6 +22,17 @@ impl Workspace {
 		self.workspace.prepare_directory()
 	}
 
+	/// Constructs a command to run in the workspace
+	pub fn command<C, I, S>(&self, command: C, args: I) -> commander::Command
+	where
+		C: AsRef<std::ffi::OsStr>,
+		I: IntoIterator<Item = S>,
+		S: AsRef<std::ffi::OsStr>,
+	{
+		self.workspace.command(command, args)
+	}
+
+	/// Runs a command in the workspace
 	pub async fn run_command<C, I, S>(&self, command: C, args: I) -> Result<String, anyhow::Error>
 	where
 		C: AsRef<std::ffi::OsStr>,
@@ -31,6 +42,7 @@ impl Workspace {
 		self.workspace.run_command(command, args).await
 	}
 
+	/// Prepares the workspace and runs the given command.
 	pub async fn run<C, I, S>(&self, command: C, args: I) -> Result<String, anyhow::Error>
 	where
 		C: AsRef<std::ffi::OsStr>,
@@ -73,6 +85,16 @@ macro_rules! vendor_workspace {
 			/// Prepares the workspace.
 			pub fn prepare_directory(&self) -> Result<(), std::io::Error> {
 				self.workspace.prepare_directory()
+			}
+
+			/// Constructs a command to run in the workspace
+			pub fn command<C, I, S>(&self, command: C, args: I) -> commander::Command
+			where
+				C: AsRef<std::ffi::OsStr>,
+				I: IntoIterator<Item = S>,
+				S: AsRef<std::ffi::OsStr>,
+			{
+				self.workspace.command(command, args)
 			}
 
 			/// Runs the given command.
