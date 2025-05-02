@@ -81,6 +81,18 @@ impl Workspace {
 		Ok(())
 	}
 
+	/// Constructs a command to run in the workspace
+	pub fn command<C, I, S>(&self, command: C, args: I) -> commander::Command
+	where
+		C: AsRef<OsStr>,
+		I: IntoIterator<Item = S>,
+		S: AsRef<OsStr>,
+	{
+		let mut command = commander::Command::new(command, true, vec![], vec![]);
+		command.args(args).current_dir(self.get_workspace_path());
+		command
+	}
+
 	/// Runs a command in the workspace
 	pub async fn run_command<C, I, S>(&self, command: C, args: I) -> Result<String, anyhow::Error>
 	where
@@ -89,12 +101,7 @@ impl Workspace {
 		S: AsRef<OsStr>,
 	{
 		// Implementation of the run_command function
-		let path = self.get_workspace_path();
-		commander::Command::new(command, true, vec![], vec![])
-			.args(args)
-			.current_dir(path)
-			.run()
-			.await
+		self.command(command, args).run().await
 	}
 
 	/// Prepares the workspace directory and runs a command

@@ -107,6 +107,21 @@ impl Command {
 		Self { inner, capture_output, stdout_senders, stderr_senders }
 	}
 
+	pub fn set_capture_output(&mut self, capture_output: bool) -> &mut Self {
+		self.capture_output = capture_output;
+		self
+	}
+
+	pub fn add_stdout_sender(&mut self, sender: Sender<String>) -> &mut Self {
+		self.stdout_senders.push(sender);
+		self
+	}
+
+	pub fn add_stderr_sender(&mut self, sender: Sender<String>) -> &mut Self {
+		self.stderr_senders.push(sender);
+		self
+	}
+
 	pub fn arg<S>(&mut self, arg: S) -> &mut Self
 	where
 		S: AsRef<OsStr>,
