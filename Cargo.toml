@@ -10,6 +10,8 @@ members = [
   # util
   "util/commander",
   "util/jsonlvar/*",
+  "util/include-dir",
+  "util/include-vendor",
 ]
 
 [workspace.package]
@@ -53,6 +55,8 @@ quote = "1.0.23"
 proc-macro2 = "1.0.32"
 paste = "1.0.12"
 convert_case = "0.8.0"
+ignore = "0.4.20"
+cargo_metadata = "0.19.2"
 
 # model checking and verification
 
@@ -70,6 +74,8 @@ jsonlvar = { path = "util/jsonlvar/jsonlvar" }
 jsonlvar-core = { path = "util/jsonlvar/core" }
 jsonlvar-macro = { path = "util/jsonlvar/macro" }
 jsonlvar-tokio = { path = "util/jsonlvar/tokio" }
+include-dir = { path = "util/include-dir" }
+include-vendor = { path = "util/include-vendor" }
 
 [workspace.lints.clippy]
 debug_assert_with_mut_call = "deny"
