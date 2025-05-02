@@ -88,7 +88,11 @@ macro_rules! vendor_workspace {
 			}
 
 			/// Constructs a command to run in the workspace
-			pub fn command<C, I, S>(&self, command: C, args: I) -> commander::Command
+			pub fn command<C, I, S>(
+				&self,
+				command: C,
+				args: I,
+			) -> include_vendor::commander::Command
 			where
 				C: AsRef<std::ffi::OsStr>,
 				I: IntoIterator<Item = S>,

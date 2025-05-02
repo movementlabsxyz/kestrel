@@ -151,7 +151,7 @@ macro_rules! workspace {
 			}
 
 			/// Constructs a command to run in the workspace
-			pub fn command<C, I, S>(&self, command: C, args: I) -> commander::Command
+			pub fn command<C, I, S>(&self, command: C, args: I) -> include_dir::commander::Command
 			where
 				C: AsRef<OsStr>,
 				I: IntoIterator<Item = S>,
