@@ -10,6 +10,11 @@ pub struct Command {
 }
 
 impl Command {
+	/// Create a new Command instance from an inner command.
+	pub fn new(command: InnerCommand) -> Self {
+		Self { inner: command }
+	}
+
 	/// Create a new Command instance from a command-line-like string.
 	pub fn line<C, I, S>(
 		command: C,
@@ -35,6 +40,24 @@ impl Command {
 			),
 		}
 	}
+
+	/// Sets whether to capture the output of the command.
+	pub fn set_capture_output(&mut self, capture_output: bool) -> &mut Self {
+		self.inner.set_capture_output(capture_output);
+		self
+	}
+
+	/// Appends a sender for the standard output of the command.
+	pub fn append_stdout(&mut self, sender: Sender<String>) -> &mut Self {
+		self.inner.append_stdout(sender);
+		self
+	}
+
+	/// Appends a sender for the standard error of the command.
+	pub fn append_stderr(&mut self, sender: Sender<String>) -> &mut Self {
+		self.inner.append_stderr(sender);
+		self
+	}
 }
 
 impl ProcessOperations for Command {
@@ -49,11 +72,11 @@ impl ProcessOperations for Command {
 	) -> Result<(), ProcessError> {
 		match pipe {
 			Pipe::STDOUT => {
-				self.inner.append_stdout(sender);
+				self.append_stdout(sender);
 				Ok(())
 			}
 			Pipe::STDERR => {
-				self.inner.append_stderr(sender);
+				self.append_stderr(sender);
 				Ok(())
 			}
 		}

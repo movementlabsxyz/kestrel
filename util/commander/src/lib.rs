@@ -112,16 +112,6 @@ impl Command {
 		self
 	}
 
-	pub fn add_stdout_sender(&mut self, sender: Sender<String>) -> &mut Self {
-		self.stdout_senders.push(sender);
-		self
-	}
-
-	pub fn add_stderr_sender(&mut self, sender: Sender<String>) -> &mut Self {
-		self.stderr_senders.push(sender);
-		self
-	}
-
 	pub fn arg<S>(&mut self, arg: S) -> &mut Self
 	where
 		S: AsRef<OsStr>,
