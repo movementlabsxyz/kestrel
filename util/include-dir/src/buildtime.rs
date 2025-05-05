@@ -1,11 +1,37 @@
+use ignore::overrides::OverrideBuilder;
 use ignore::WalkBuilder;
+use std::collections::HashSet;
 use std::env;
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::BufWriter;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::path::PathBuf;
 use zip::{write::SimpleFileOptions, ZipWriter};
+
+pub trait PreBuildHook: Debug + Clone {
+	fn before(&self) -> Result<(), BuildtimeError>;
+}
+
+pub trait PostBuildHook: Debug + Clone {
+	fn after(&self) -> Result<(), BuildtimeError>;
+}
+
+#[derive(Debug, Clone)]
+pub struct Noop;
+
+impl PreBuildHook for Noop {
+	fn before(&self) -> Result<(), BuildtimeError> {
+		Ok(())
+	}
+}
+
+impl PostBuildHook for Noop {
+	fn after(&self) -> Result<(), BuildtimeError> {
+		Ok(())
+	}
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum BuildtimeError {
@@ -14,17 +40,49 @@ pub enum BuildtimeError {
 }
 
 #[derive(Debug, Clone)]
-pub struct Buildtime {
+pub struct Buildtime<Pre = Noop, Post = Noop>
+where
+	Pre: PreBuildHook,
+	Post: PostBuildHook,
+{
 	directory_path: PathBuf,
 	name: String,
+	include_patterns: HashSet<String>,
+	pre_build_hooks: Vec<Pre>,
+	post_build_hooks: Vec<Post>,
 }
 
-impl Buildtime {
-	pub fn new(directory_path: PathBuf, name: String) -> Self {
-		Self { directory_path, name }
+impl<Pre, Post> Buildtime<Pre, Post>
+where
+	Pre: PreBuildHook,
+	Post: PostBuildHook,
+{
+	pub fn new(
+		directory_path: PathBuf,
+		name: String,
+		include_patterns: HashSet<String>,
+		pre_build_hooks: Vec<Pre>,
+		post_build_hooks: Vec<Post>,
+	) -> Self {
+		Self { directory_path, name, include_patterns, pre_build_hooks, post_build_hooks }
 	}
 
+	/// Adds a pre-build hook.
+	pub fn before(&mut self, hook: Pre) {
+		self.pre_build_hooks.push(hook);
+	}
+
+	/// Adds a post-build hook.
+	pub fn after(&mut self, hook: Post) {
+		self.post_build_hooks.push(hook);
+	}
+	/// Builds the directory into a zip file.
 	pub fn build(&self) -> Result<(), BuildtimeError> {
+		// Run the pre-build hooks
+		for hook in &self.pre_build_hooks {
+			hook.before()?;
+		}
+
 		// Define the source directory (relative to the crate)
 		if !self.directory_path.exists() {
 			return Err(BuildtimeError::Internal(Box::new(std::io::Error::new(
@@ -41,12 +99,20 @@ impl Buildtime {
 		let zip_file = File::create(&zip_path).map_err(|e| BuildtimeError::Internal(e.into()))?;
 		let mut zip = ZipWriter::new(BufWriter::new(zip_file));
 
-		// create an ignore walker
-		let walker = WalkBuilder::new(self.directory_path.clone())
-			.git_ignore(true)
-			.git_exclude(true)
-			.hidden(false)
-			.build();
+		// Create an ignore walker with overrides
+		let mut builder = WalkBuilder::new(self.directory_path.clone());
+		builder.git_ignore(true).git_exclude(true).hidden(false);
+
+		// Add custom include patterns as overrides
+		if !self.include_patterns.is_empty() {
+			let mut overrides = OverrideBuilder::new(self.directory_path.clone());
+			for pattern in &self.include_patterns {
+				overrides.add(pattern).map_err(|e| BuildtimeError::Internal(e.into()))?;
+			}
+			builder.overrides(overrides.build().map_err(|e| BuildtimeError::Internal(e.into()))?);
+		}
+
+		let walker = builder.build();
 
 		// Walk through the source directory recursively
 		for entry in walker.filter_map(Result::ok) {
@@ -83,6 +149,12 @@ impl Buildtime {
 		}
 
 		zip.finish().map_err(|e| BuildtimeError::Internal(e.into()))?;
+
+		// Run the post-build hooks
+		for hook in &self.post_build_hooks {
+			hook.after()?;
+		}
+
 		println!("cargo:rerun-if-changed={}", self.directory_path.display());
 
 		Ok(())
