@@ -28,12 +28,7 @@ where
 	Post: PostBuildHook,
 {
 	/// Create a new buildtime configuration.
-	pub fn try_new(
-		vendor_name: impl Into<String>,
-		include_patterns: HashSet<String>,
-		pre_build_hooks: Vec<Pre>,
-		post_build_hooks: Vec<Post>,
-	) -> Result<Self, BuildtimeError> {
+	pub fn try_new(vendor_name: impl Into<String>) -> Result<Self, BuildtimeError> {
 		let vendor_name = vendor_name.into();
 
 		// Get the workspace root using cargo_metadata
@@ -45,15 +40,14 @@ where
 		let vendor_path = PathBuf::from(workspace_root).join(".vendors").join(&vendor_name);
 
 		// Create the include-dir buildtime instance
-		let include_dir = IncludeDirBuildtime::new(
-			vendor_path,
-			vendor_name.clone(),
-			include_patterns,
-			pre_build_hooks,
-			post_build_hooks,
-		);
+		let include_dir = IncludeDirBuildtime::new(vendor_path, vendor_name.clone());
 
 		Ok(Self { vendor_name, include_dir })
+	}
+
+	/// Adds a custom include pattern.
+	pub fn include(&mut self, pattern: impl Into<String>) {
+		self.include_dir.include(pattern);
 	}
 
 	/// Adds a pre-build hook.

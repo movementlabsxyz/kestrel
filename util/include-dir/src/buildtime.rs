@@ -57,14 +57,19 @@ where
 	Pre: PreBuildHook,
 	Post: PostBuildHook,
 {
-	pub fn new(
-		directory_path: PathBuf,
-		name: String,
-		include_patterns: HashSet<String>,
-		pre_build_hooks: Vec<Pre>,
-		post_build_hooks: Vec<Post>,
-	) -> Self {
-		Self { directory_path, name, include_patterns, pre_build_hooks, post_build_hooks }
+	pub fn new(directory_path: PathBuf, name: String) -> Self {
+		Self {
+			directory_path,
+			name,
+			include_patterns: HashSet::new(),
+			pre_build_hooks: Vec::new(),
+			post_build_hooks: Vec::new(),
+		}
+	}
+
+	/// Adds a custom include pattern.
+	pub fn include(&mut self, pattern: impl Into<String>) {
+		self.include_patterns.insert(pattern.into());
 	}
 
 	/// Adds a pre-build hook.
