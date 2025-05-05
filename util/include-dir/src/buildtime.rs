@@ -10,25 +10,31 @@ use std::path::Path;
 use std::path::PathBuf;
 use zip::{write::SimpleFileOptions, ZipWriter};
 
+#[derive(Debug, thiserror::Error)]
+pub enum HookError {
+	#[error("internal error: {0}")]
+	Internal(#[source] Box<dyn std::error::Error + Send + Sync>),
+}
+
 pub trait PreBuildHook: Debug + Clone {
-	fn before(&self) -> Result<(), BuildtimeError>;
+	fn before(&self) -> Result<(), HookError>;
 }
 
 pub trait PostBuildHook: Debug + Clone {
-	fn after(&self) -> Result<(), BuildtimeError>;
+	fn after(&self) -> Result<(), HookError>;
 }
 
 #[derive(Debug, Clone)]
 pub struct Noop;
 
 impl PreBuildHook for Noop {
-	fn before(&self) -> Result<(), BuildtimeError> {
+	fn before(&self) -> Result<(), HookError> {
 		Ok(())
 	}
 }
 
 impl PostBuildHook for Noop {
-	fn after(&self) -> Result<(), BuildtimeError> {
+	fn after(&self) -> Result<(), HookError> {
 		Ok(())
 	}
 }
@@ -85,7 +91,7 @@ where
 	pub fn build(&self) -> Result<(), BuildtimeError> {
 		// Run the pre-build hooks
 		for hook in &self.pre_build_hooks {
-			hook.before()?;
+			hook.before().map_err(|e| BuildtimeError::Internal(e.into()))?;
 		}
 
 		// Define the source directory (relative to the crate)
@@ -157,7 +163,7 @@ where
 
 		// Run the post-build hooks
 		for hook in &self.post_build_hooks {
-			hook.after()?;
+			hook.after().map_err(|e| BuildtimeError::Internal(e.into()))?;
 		}
 
 		println!("cargo:rerun-if-changed={}", self.directory_path.display());

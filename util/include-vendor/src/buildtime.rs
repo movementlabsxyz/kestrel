@@ -1,6 +1,7 @@
 use cargo_metadata::MetadataCommand;
-pub use include_dir::{Buildtime as IncludeDirBuildtime, Noop, PostBuildHook, PreBuildHook};
-use std::collections::HashSet;
+pub use include_dir::{
+	Buildtime as IncludeDirBuildtime, HookError, Noop, PostBuildHook, PreBuildHook,
+};
 use std::path::PathBuf;
 
 /// Error type for buildtime operations.
