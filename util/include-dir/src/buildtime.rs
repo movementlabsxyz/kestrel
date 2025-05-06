@@ -1,4 +1,3 @@
-use ignore::overrides::OverrideBuilder;
 use ignore::WalkBuilder;
 use std::collections::HashSet;
 use std::env;
@@ -114,21 +113,68 @@ where
 		let mut builder = WalkBuilder::new(self.directory_path.clone());
 		builder.git_ignore(true).git_exclude(true).hidden(false);
 
-		// Add custom include patterns as overrides
-		if !self.include_patterns.is_empty() {
-			let mut overrides = OverrideBuilder::new(self.directory_path.clone());
-			for pattern in &self.include_patterns {
-				overrides.add(pattern).map_err(|e| BuildtimeError::Internal(e.into()))?;
-			}
-			builder.overrides(overrides.build().map_err(|e| BuildtimeError::Internal(e.into()))?);
-		}
-
 		let walker = builder.build();
 
-		// Walk through the source directory recursively
+		// Create a separate walker for explicitly included files
+		let mut explicit_builder = WalkBuilder::new(self.directory_path.clone());
+		explicit_builder.git_ignore(false).git_exclude(false).hidden(true);
+
+		// Add custom include patterns
+		if !self.include_patterns.is_empty() {
+			for pattern in &self.include_patterns {
+				explicit_builder.add(pattern);
+			}
+		}
+
+		let explicit_walker = explicit_builder.build();
+
+		// Create a HashSet to track processed paths
+		let mut processed_paths = HashSet::new();
+
+		// First process git-tracked files
 		for entry in walker.filter_map(Result::ok) {
 			let path = entry.path();
 			let name = path.strip_prefix(&self.directory_path).unwrap().to_str().unwrap();
+			processed_paths.insert(name.to_string());
+
+			if path.is_file() {
+				// Get the file's Unix permissions
+				let metadata = path.metadata().map_err(|e| BuildtimeError::Internal(e.into()))?;
+				let mode = metadata.permissions().mode();
+
+				// Create options with Unix permissions
+				let options = SimpleFileOptions::default()
+					.compression_method(zip::CompressionMethod::Stored)
+					.unix_permissions(mode);
+
+				let mut file = File::open(path).map_err(|e| BuildtimeError::Internal(e.into()))?;
+				zip.start_file(name, options).map_err(|e| BuildtimeError::Internal(e.into()))?;
+				std::io::copy(&mut file, &mut zip)
+					.map_err(|e| BuildtimeError::Internal(e.into()))?;
+			} else if path.is_dir() {
+				// Get the directory's Unix permissions
+				let metadata = path.metadata().map_err(|e| BuildtimeError::Internal(e.into()))?;
+				let mode = metadata.permissions().mode();
+
+				// Create options with Unix permissions
+				let options = SimpleFileOptions::default()
+					.compression_method(zip::CompressionMethod::Stored)
+					.unix_permissions(mode);
+
+				zip.add_directory(name, options)
+					.map_err(|e| BuildtimeError::Internal(e.into()))?;
+			}
+		}
+
+		// Then process explicitly included files that weren't already processed
+		for entry in explicit_walker.filter_map(Result::ok) {
+			let path = entry.path();
+			let name = path.strip_prefix(&self.directory_path).unwrap().to_str().unwrap();
+
+			// Skip if we already processed this path
+			if processed_paths.contains(name) {
+				continue;
+			}
 
 			if path.is_file() {
 				// Get the file's Unix permissions
