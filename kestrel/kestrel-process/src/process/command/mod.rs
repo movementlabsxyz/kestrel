@@ -58,6 +58,11 @@ impl Command {
 		self.inner.append_stderr(sender);
 		self
 	}
+
+	/// Working directory of the command.
+	pub fn get_current_dir(&self) -> Option<&Path> {
+		self.inner.get_current_dir()
+	}
 }
 
 impl ProcessOperations for Command {

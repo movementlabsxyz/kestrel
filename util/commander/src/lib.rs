@@ -144,6 +144,10 @@ impl Command {
 		self
 	}
 
+	pub fn get_current_dir(&self) -> Option<&Path> {
+		self.inner.as_std().get_current_dir()
+	}
+
 	/// Runs the command and captures its output while streaming it.
 	pub async fn run(&mut self) -> Result<String> {
 		let cmd_display = self.inner.as_std().get_program().to_string_lossy().into_owned();
