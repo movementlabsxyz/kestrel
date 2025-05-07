@@ -2,3 +2,4 @@ target
 *.pem
 .debug
 .env*
+.DS_Store
