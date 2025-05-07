@@ -12,6 +12,7 @@ members = [
   "util/jsonlvar/*",
   "util/include-dir",
   "util/include-vendor",
+  "util/ready-docker",
 ]
 
 [workspace.package]
@@ -57,6 +58,7 @@ paste = "1.0.12"
 convert_case = "0.8.0"
 ignore = "0.4.20"
 cargo_metadata = "0.19.2"
+bollard = "0.18.1"
 
 # model checking and verification
 
@@ -76,6 +78,7 @@ jsonlvar-macro = { path = "util/jsonlvar/macro" }
 jsonlvar-tokio = { path = "util/jsonlvar/tokio" }
 include-dir = { path = "util/include-dir" }
 include-vendor = { path = "util/include-vendor" }
+ready-docker = { path = "util/ready-docker" }
 
 [workspace.lints.clippy]
 debug_assert_with_mut_call = "deny"
