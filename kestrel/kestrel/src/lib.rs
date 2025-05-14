@@ -49,6 +49,7 @@ impl<T> Task<T> {
 	/// Aborts the task
 	pub fn abort(&self) {
 		self.abort_handle.abort();
+		self.handle.abort();
 	}
 
 	/// Returns whether the task has been aborted
@@ -72,7 +73,12 @@ impl<T> Task<T> {
 	pub async fn await_allow_abort(self) -> Result<(), TaskError> {
 		match self.maybe().await {
 			Ok(_) => Ok(()),
-			Err(e) => Err(e),
+			Err(TaskError::Join(join_error)) if join_error.is_cancelled() => {
+				// If the task was cancelled via its JoinHandle (which our Task::abort now does),
+				// consider it a successful "end" for the purposes of this function.
+				Ok(())
+			}
+			Err(e) => Err(e), // Other errors (like panics or non-cancellation JoinErrors) are still errors.
 		}
 	}
 }

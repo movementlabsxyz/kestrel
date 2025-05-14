@@ -39,9 +39,6 @@ mod tests {
 
 		abort!(task1, task2);
 
-		// Wait a bit to ensure tasks are aborted
-		sleep(Duration::from_millis(100)).await;
-
 		assert!(task1.is_aborted());
 		assert!(task2.is_aborted());
 	}
