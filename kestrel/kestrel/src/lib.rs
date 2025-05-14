@@ -41,10 +41,6 @@ pub struct Task<T> {
 	pub abort_handle: AbortHandle,
 }
 
-thread_local! {
-	static NEXT_TASK_ID: RefCell<AtomicU64> = RefCell::new(AtomicU64::new(0));
-}
-
 impl<T> Task<T> {
 	/// Aborts the task
 	pub fn abort(&self) {
@@ -80,6 +76,16 @@ impl<T> Task<T> {
 			}
 			Err(e) => Err(e), // Other errors (like panics or non-cancellation JoinErrors) are still errors.
 		}
+	}
+}
+
+/// In contrast to tokio's task, this task will abort when dropped
+///
+/// This means you have to hold the task handle to ensure the task is not aborted
+/// when the task handle is dropped.
+impl<T> Drop for Task<T> {
+	fn drop(&mut self) {
+		self.abort();
 	}
 }
 
