@@ -103,7 +103,8 @@ impl Command {
 		stdout_senders: Vec<Sender<String>>,
 		stderr_senders: Vec<Sender<String>>,
 	) -> Self {
-		let inner = InnerCommand::new(program);
+		let mut inner = InnerCommand::new(program);
+		inner.kill_on_drop(true);
 		Self { inner, capture_output, stdout_senders, stderr_senders }
 	}
 
@@ -227,7 +228,7 @@ impl Command {
 		let status = child.wait().await?;
 		if !status.success() {
 			return Err(anyhow::anyhow!(
-				"Command {cmd_display} failed with args {args_display}\nError Output: {}",
+				"Command {cmd_display} failed with args {args_display}\nError  {}",
 				stderr_output.unwrap_or_else(|| "Unknown error".to_string())
 			));
 		}
