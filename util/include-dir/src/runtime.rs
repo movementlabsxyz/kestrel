@@ -178,6 +178,16 @@ macro_rules! workspace {
 				Ok(Self::new(workspace_path))
 			}
 
+			/// Generates a new workspace in ~/.debug/{uid}
+			pub fn try_debug_home() -> Result<Self, std::io::Error> {
+				let uuid = include_dir::uuid::Uuid::new_v4();
+				let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+				let workspace_path = include_dir::WorkspacePath::PathBuf(
+					Path::new(&home).join(".debug").join(uuid.to_string()),
+				);
+				Ok(Self::new(workspace_path))
+			}
+
 			/// Gets the workspace path
 			pub fn get_workspace_path(&self) -> &std::path::Path {
 				self.workspace.get_workspace_path()
