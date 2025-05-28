@@ -47,6 +47,14 @@ impl Workspace {
 		Ok(Workspace { contracts_zip, workspace_path: WorkspacePath::PathBuf(path) })
 	}
 
+	/// Generate a new workspace in ~/.debug/{uid}
+	pub fn try_debug_home(contracts_zip: &'static [u8]) -> Result<Self, std::io::Error> {
+		let uid = uuid::Uuid::new_v4();
+		let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+		let path = Path::new(&home).join(".debug").join(uid.to_string());
+		Ok(Workspace { contracts_zip, workspace_path: WorkspacePath::PathBuf(path) })
+	}
+
 	/// Gets the workspace path
 	pub fn get_workspace_path(&self) -> &Path {
 		self.workspace_path.get_path()
