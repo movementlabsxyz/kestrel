@@ -40,6 +40,13 @@ impl Workspace {
 		Ok(Workspace { contracts_zip, workspace_path: WorkspacePath::TempDir(temp_dir) })
 	}
 
+	/// Generates a new workspaces in .debug/{uid}
+	pub fn try_debug(contracts_zip: &'static [u8]) -> Result<Self, std::io::Error> {
+		let uid = uuid::Uuid::new_v4();
+		let path = Path::new(".debug").join(uid.to_string());
+		Ok(Workspace { contracts_zip, workspace_path: WorkspacePath::PathBuf(path) })
+	}
+
 	/// Gets the workspace path
 	pub fn get_workspace_path(&self) -> &Path {
 		self.workspace_path.get_path()
@@ -152,6 +159,14 @@ macro_rules! workspace {
 			pub fn try_temp() -> Result<Self, std::io::Error> {
 				let temp_dir = include_dir::TempDir::new()?;
 				let workspace_path = include_dir::WorkspacePath::TempDir(temp_dir);
+				Ok(Self::new(workspace_path))
+			}
+
+			/// Generates a new workspaces in .debug/{uid}
+			pub fn try_debug() -> Result<Self, std::io::Error> {
+				let uuid = include_dir::uuid::Uuid::new_v4();
+				let workspace_path =
+					include_dir::WorkspacePath::PathBuf(Path::new(".debug").to_path_buf());
 				Ok(Self::new(workspace_path))
 			}
 

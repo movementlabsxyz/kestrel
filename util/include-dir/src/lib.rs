@@ -6,3 +6,4 @@ pub use runtime::*;
 pub use tempfile::TempDir;
 
 pub use commander;
+pub use uuid;

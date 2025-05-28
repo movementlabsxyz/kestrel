@@ -7,3 +7,5 @@ pub use tempfile::TempDir;
 
 pub use include_dir::commander;
 pub use include_dir::WorkspacePath;
+
+pub use include_dir::uuid;

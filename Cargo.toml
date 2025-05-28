@@ -59,6 +59,7 @@ convert_case = "0.8.0"
 ignore = "0.4.20"
 cargo_metadata = "0.19.2"
 bollard = "0.15.0"
+uuid = "1.10.0"
 
 # model checking and verification
 

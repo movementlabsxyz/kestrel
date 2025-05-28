@@ -2,12 +2,9 @@ use futures::future::{AbortHandle, Abortable, Aborted};
 pub use kestrel_macro::*;
 pub use kestrel_process::*;
 pub use kestrel_state::*;
-use std::cell::RefCell;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::AtomicU64;
 use std::task::{Context, Poll};
-use std::thread_local;
 use tokio::task::JoinHandle;
 
 /// Errors thrown by the Task struct.

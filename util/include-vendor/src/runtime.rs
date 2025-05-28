@@ -14,6 +14,10 @@ impl Workspace {
 		Ok(Self { workspace: IncludeDirWorkspace::try_temp(contracts_zip)? })
 	}
 
+	pub fn try_debug(contracts_zip: &'static [u8]) -> Result<Self, std::io::Error> {
+		Ok(Self { workspace: IncludeDirWorkspace::try_debug(contracts_zip)? })
+	}
+
 	pub fn get_workspace_path(&self) -> &std::path::Path {
 		self.workspace.get_workspace_path()
 	}
@@ -88,6 +92,14 @@ macro_rules! vendor_workspace {
 			pub fn try_temp() -> Result<Self, std::io::Error> {
 				let temp_dir = include_vendor::TempDir::new()?;
 				let workspace_path = include_vendor::WorkspacePath::TempDir(temp_dir);
+				Ok(Self::new(workspace_path))
+			}
+
+			/// Generates a new workspaces in .debug/{uid}
+			pub fn try_debug() -> Result<Self, std::io::Error> {
+				let uuid = include_vendor::uuid::Uuid::new_v4();
+				let workspace_path =
+					include_vendor::WorkspacePath::PathBuf(Path::new(".debug").to_path_buf());
 				Ok(Self::new(workspace_path))
 			}
 

@@ -17,6 +17,7 @@ ignore = { workspace = true }
 commander = { workspace = true }
 thiserror = { workspace = true }
 convert_case = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
 
 [lints]
 workspace = true
