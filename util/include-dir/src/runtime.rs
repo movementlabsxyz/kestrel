@@ -166,7 +166,7 @@ macro_rules! workspace {
 			pub fn try_debug() -> Result<Self, std::io::Error> {
 				let uuid = include_dir::uuid::Uuid::new_v4();
 				let workspace_path =
-					include_dir::WorkspacePath::PathBuf(Path::new(".debug").to_path_buf());
+					include_dir::WorkspacePath::PathBuf(Path::new(".debug").join(uuid.to_string()));
 				Ok(Self::new(workspace_path))
 			}
 
