@@ -144,3 +144,32 @@ pub struct Vendor {
 	/// The path to the vendor.
 	pub path: std::path::PathBuf,
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_vendors() -> Result<(), anyhow::Error> {
+		// remove the .vendor directory if it exists
+		let vendors_path = vendors_path()?;
+		if vendors_path.exists() {
+			std::fs::remove_dir_all(vendors_path)?;
+		}
+
+		// create a new vendor plan
+		let plan = VendorPlan::try_from_cargo_dep("qip")?;
+		let vendor = plan.execute()?;
+
+		// check that qip is in the vendor path and is checked out at the correct hash
+		let qip_path = vendor.path;
+		assert!(qip_path.exists());
+		let qip_git = git2::Repository::open(qip_path)?;
+		let qip_head = qip_git.head()?;
+		let qip_head_id = qip_head.target().unwrap();
+		let qip_head_id = qip_head_id.to_string();
+		assert_eq!(qip_head_id, "070d5bcd1b248673d89faddae3a19f7894ab357e");
+
+		Ok(())
+	}
+}
