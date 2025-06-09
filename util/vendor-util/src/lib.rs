@@ -102,6 +102,16 @@ impl VendorPlan {
 		Self::new(vendor_name, git_rev, git_url, VendorStrategy::TargetVendor)
 	}
 
+	/// Renames the vendor plan to a new name
+	pub fn rename(&mut self, new_name: String) {
+		self.vendor_name = new_name;
+	}
+
+	/// Sets the strategy of the vendor plan
+	pub fn set_strategy(&mut self, strategy: VendorStrategy) {
+		self.strategy = strategy;
+	}
+
 	/// Execute the vendor plan, cloning or updating the repository as needed.
 	/// Returns a Vendor instance if successful.
 	pub fn execute(&self) -> Result<Vendor, VendorPlanError> {
