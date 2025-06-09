@@ -1,4 +1,4 @@
-use crate::VendorPlan;
+use crate::{VendorPlan, VendorStrategy};
 use cargo_metadata::MetadataCommand;
 
 /// Error thrown when operating on a vendor plan.
@@ -21,7 +21,10 @@ impl VendorPlan {
 	/// The dependency must be a git dependency with a URL and revision.
 	///
 	/// NOTE: dependency must be in the crate.
-	pub fn try_from_cargo_dep(dep_name: impl AsRef<str>) -> Result<Self, CargoVendorPlanError> {
+	pub fn try_from_cargo_dep(
+		dep_name: impl AsRef<str>,
+		strategy: VendorStrategy,
+	) -> Result<Self, CargoVendorPlanError> {
 		let dep_name = dep_name.as_ref();
 
 		// Get cargo metadata
@@ -74,7 +77,7 @@ impl VendorPlan {
 			return Err(CargoVendorPlanError::NoGitUrl(dep_name.to_string()));
 		}
 
-		Ok(VendorPlan::new(dep_name.to_string(), git_rev, git_url))
+		Ok(VendorPlan::new(dep_name.to_string(), git_rev, git_url, strategy))
 	}
 }
 
@@ -84,7 +87,7 @@ mod tests {
 
 	#[test]
 	fn test_try_from_cargo_dep() -> Result<(), anyhow::Error> {
-		let plan = VendorPlan::try_from_cargo_dep("qip")?;
+		let plan = VendorPlan::try_from_cargo_dep("qip", VendorStrategy::DotVendor)?;
 		assert_eq!(plan.vendor_name, "qip");
 		assert_eq!(plan.git_url, "https://github.com/Renmusxd/RustQIP.git");
 		assert_eq!(plan.git_rev, "070d5bcd1b248673d89faddae3a19f7894ab357e");
