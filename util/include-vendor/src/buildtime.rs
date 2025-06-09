@@ -1,8 +1,7 @@
-use cargo_metadata::MetadataCommand;
 pub use include_dir::{
 	Buildtime as IncludeDirBuildtime, HookError, Noop, PostBuildHook, PreBuildHook,
 };
-use std::path::PathBuf;
+use vendor_util::Vendor;
 
 /// Error type for buildtime operations.
 #[derive(Debug, thiserror::Error)]
@@ -18,7 +17,7 @@ where
 	Post: PostBuildHook,
 {
 	/// The name of the vendor.
-	pub vendor_name: String,
+	pub vendor: Vendor,
 	/// The include-dir buildtime instance.
 	include_dir: IncludeDirBuildtime<Pre, Post>,
 }
@@ -29,21 +28,12 @@ where
 	Post: PostBuildHook,
 {
 	/// Create a new buildtime configuration.
-	pub fn try_new(vendor_name: impl Into<String>) -> Result<Self, BuildtimeError> {
-		let vendor_name = vendor_name.into();
-
-		// Get the workspace root using cargo_metadata
-		let metadata =
-			MetadataCommand::new().exec().map_err(|e| BuildtimeError::Internal(e.into()))?;
-		let workspace_root = metadata.workspace_root;
-
-		// Construct the path to the vendor directory from workspace root
-		let vendor_path = PathBuf::from(workspace_root).join(".vendors").join(&vendor_name);
-
+	pub fn try_new(vendor: Vendor) -> Result<Self, BuildtimeError> {
 		// Create the include-dir buildtime instance
-		let include_dir = IncludeDirBuildtime::new(vendor_path, vendor_name.clone());
+		let include_dir =
+			IncludeDirBuildtime::new(vendor.path.clone(), vendor.plan.vendor_name.clone());
 
-		Ok(Self { vendor_name, include_dir })
+		Ok(Self { vendor, include_dir })
 	}
 
 	/// Adds a custom include pattern.
