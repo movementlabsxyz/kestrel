@@ -13,6 +13,7 @@ members = [
   "util/include-dir",
   "util/include-vendor",
   "util/ready-docker",
+  "util/vendor-util"
 ]
 
 [workspace.package]
@@ -60,6 +61,9 @@ ignore = "0.4.20"
 cargo_metadata = "0.19.2"
 bollard = "0.15.0"
 uuid = "1.10.0"
+git2 = "0.20.2"
+
+qip = { git = "https://github.com/Renmusxd/RustQIP.git", rev = "070d5bcd1b248673d89faddae3a19f7894ab357e" }
 
 # model checking and verification
 
@@ -80,6 +84,7 @@ jsonlvar-tokio = { path = "util/jsonlvar/tokio" }
 include-dir = { path = "util/include-dir" }
 include-vendor = { path = "util/include-vendor" }
 ready-docker = { path = "util/ready-docker" }
+vendor-util = { path = "util/vendor-util" }
 
 [workspace.lints.clippy]
 debug_assert_with_mut_call = "deny"
