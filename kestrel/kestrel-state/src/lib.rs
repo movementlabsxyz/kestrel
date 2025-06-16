@@ -57,6 +57,13 @@ impl<T: Clone + Send + Sync + 'static> WritableState<T> {
 		self.state.notify.notify_waiters();
 	}
 
+	/// Resets the value to None and notifies waiting readers.
+	pub async fn reset(&self) {
+		let mut lock = self.state.inner.write().await;
+		*lock = None;
+		self.state.notify.notify_waiters();
+	}
+
 	/// Gets a clone of the current value if it's set.
 	pub async fn get(&self) -> Option<T> {
 		let lock = self.state.inner.read().await;
